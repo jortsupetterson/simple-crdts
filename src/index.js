@@ -1,3 +1,5 @@
 import { LWW } from "./LWW/class";
 import { PNCounter } from "./PNCounter/class";
-export { LWW, PNCounter };
+import { TextRGA } from "./TextRGA/class";
+
+export { LWW, PNCounter, TextRGA };

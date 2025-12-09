@@ -3,7 +3,7 @@
  * CRDT model where:
  *   - Each replica tracks its own increments and decrements
  *   - Merge = element-wise max
- *   - Final value = sum(increments) − sum(decrements)
+ *   - Final value = sum(increments) - sum(decrements)
  */
 export class PNCounter {
   /**

@@ -1,11 +1,12 @@
 # simple-crdts
 
-Lightweight, zero-dependency CRDT primitives you can drop into offline-first or multi-node apps. Ships with a Last-Writer-Wins register and a PN-Counter plus ready-to-use JSON serialization and TypeScript typings.
+Lightweight, zero-dependency CRDT primitives you can drop into offline-first or multi-node apps. Ships with a Last-Writer-Wins register, a PN-Counter, and a Text RGA (text CRDT) plus ready-to-use JSON serialization and TypeScript typings.
 
 ## Features
 
-- Minimal API: `LWW` register and `PNCounter` with deterministic merges
+- Minimal API: `LWW`, `PNCounter`, and `TextRGA` with deterministic merges
 - Offline-friendly: serialize to JSON, rehydrate with `fromJSON`
+- Text-aware: TextRGA supports insert/delete with stable callbacks
 - ESM first: tree-shakeable and side-effect free
 - Typed: bundled `.d.ts` for painless TS/JS IntelliSense
 
@@ -50,35 +51,66 @@ draft.competition(published);
 draft.value; // -> "published"
 ```
 
+### TextRGA (text CRDT)
+
+```js
+import { TextRGA } from "simple-crdts";
+
+const a = new TextRGA("node-a");
+a.insertAt(0, "H");
+a.insertAt(1, "i");
+
+// Another replica
+const b = TextRGA.fromJSON(a.toJSON());
+b.insertAt(2, "!");
+
+// Merge and materialize
+a.merge(b);
+a.getText(); // -> "Hi!"
+```
+
 ### Persist and rehydrate
 
 ```js
-import { PNCounter, LWW } from "simple-crdts";
+import { PNCounter, LWW, TextRGA } from "simple-crdts";
 
 const counter = new PNCounter("cache-node").increment();
 localStorage.setItem("counter", JSON.stringify(counter.toJSON()));
 
-const restored = PNCounter.fromJSON(
+const restoredCounter = PNCounter.fromJSON(
   JSON.parse(localStorage.getItem("counter") || "{}")
 );
 
 const title = new LWW("Hello", "node-1", 4);
 const payload = JSON.stringify(title.toJSON()); // send over the wire
-const merged = LWW.fromJSON(JSON.parse(payload));
+const mergedTitle = LWW.fromJSON(JSON.parse(payload));
+
+const doc = new TextRGA("writer");
+doc.insertAt(0, "A");
+localStorage.setItem("doc", JSON.stringify(doc.toJSON()));
+const restoredDoc = TextRGA.fromJSON(
+  JSON.parse(localStorage.getItem("doc") || "{}")
+);
 ```
 
 ## API in 30 seconds
 
-- `PNCounter(localNodeId, increments?, decrements?)` – create a replica.
-- `increment()` / `decrement()` – mutate the local register.
-- `merge(other)` – element-wise max merge; returns `this`.
-- `getCount()` – returns sum(increments) - sum(decrements).
-- `toJSON()` / `PNCounter.fromJSON(json)` – serialize/rehydrate.
+- `PNCounter(localNodeId, increments?, decrements?)` - create a replica.
+- `increment()` / `decrement()` - mutate the local register.
+- `merge(other)` - element-wise max merge; returns `this`.
+- `getCount()` - returns sum(increments) - sum(decrements).
+- `toJSON()` / `PNCounter.fromJSON(json)` - serialize/rehydrate.
 
-- `LWW(value, nodeId?, counter?, timestamp?)` – create a register.
-- `competition(other)` – merge winner into `this` using timestamp, then counter, then nodeId.
-- `toJSON()` / `LWW.fromJSON(json)` – serialize/rehydrate.
+- `LWW(value, nodeId?, counter?, timestamp?)` - create a register.
+- `competition(other)` - merge winner into `this` using timestamp, then counter, then nodeId.
+- `toJSON()` / `LWW.fromJSON(json)` - serialize/rehydrate.
 - Constants: `LWW.STALE_THRESHOLD_MS` (30 min) and `LWW.COUNTER_WINDOW_MS` (30 s) tune the merge windows.
+
+- `TextRGA(nodeId, localCounter?, entries?, order?, onInsert?, onDelete?)` - create a text replica; callbacks fire on local inserts/deletes.
+- `insertAt(index, char)` / `deleteAt(index)` - mutate the visible text.
+- `merge(other)` - union entries and deterministic order; returns `this`.
+- `getText()` - materialize current visible string.
+- `toJSON()` / `TextRGA.fromJSON(json)` - serialize/rehydrate (callbacks are not serialized).
 
 ## Notes
 
